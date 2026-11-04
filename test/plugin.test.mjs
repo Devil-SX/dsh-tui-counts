@@ -7,6 +7,8 @@ import test from 'node:test'
 // The plugin reads its state root once, at import time.
 const HOME = mkdtempSync(join(tmpdir(), 'dsh-tui-counts-'))
 process.env.DSH_TUI_COUNTS_HOME = HOME
+// The row-filter patch edits the installed dsh-TUI; tests must never do that.
+process.env.DSH_TUI_COUNTS_NO_PATCH = '1'
 
 const { apply, name, inject } = await import('../index.mjs')
 

@@ -1,7 +1,7 @@
 {
   "name": "dsh-tui-counts",
-  "version": "0.1.0",
-  "description": "Footer counters for dsh-TUI: tool calls, thinking segments and billed tokens for the current turn or the whole session",
+  "version": "0.2.0",
+  "description": "Counters for dsh-TUI — tool calls, thinking segments and billed tokens — plus an optional filter that hides the tool cards and thinking blocks themselves",
   "type": "module",
   "main": "./index.mjs",
   "exports": {
@@ -14,6 +14,7 @@
     "index.mjs",
     "counts.mjs",
     "cordis.patch.yml",
+    "scripts/patch-message-list.mjs",
     "README.md",
     "LICENSE"
   ],
@@ -33,6 +34,8 @@
     }
   },
   "scripts": {
+    "postinstall": "node scripts/patch-message-list.mjs --quiet",
+    "patch:revert": "node scripts/patch-message-list.mjs --revert",
     "test": "node --test test/*.test.mjs"
   },
   "engines": {

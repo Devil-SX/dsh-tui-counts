@@ -25,6 +25,7 @@ import { mkdirSync, readFileSync, watch, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { SessionCounts, detailText, fieldText } from './counts.mjs'
+import { applyHostPatch } from './scripts/patch-message-list.mjs'
 
 export const name = 'tui-counts'
 export const inject = ['tuiStatus']
@@ -33,28 +34,67 @@ const FIELD_KEY = 'counts'
 // `DSH_TUI_COUNTS_HOME` exists so tests (and unusual installs) can point the
 // saved scope and the resume marker somewhere other than the real home.
 const ROOT = process.env.DSH_TUI_COUNTS_HOME || join(homedir(), '.dsh-tui')
-const SCOPE_FILE = join(ROOT, 'counts.json')
+const SETTINGS_FILE = join(ROOT, 'counts.json')
 const RESUME_FILE = join(ROOT, 'resume.txt')
 const RENDER_DELAY_MS = 120
 
 const envFlag = (key) => ['1', 'true', 'yes', 'on'].includes(String(process.env[key] ?? '').toLowerCase())
 
+/** Read the saved settings object, tolerating a missing or broken file. */
+function readSettings() {
+  try {
+    const raw = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'))
+    return raw !== null && typeof raw === 'object' ? raw : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Which transcript rows to remove.
+ *
+ * The host has no plugin seam for rows, so these flags are consumed by the
+ * optional `MessageList.js` patch (see `scripts/patch-message-list.mjs`). They
+ * are read at module scope, before the TUI mounts, so the very first frame is
+ * already filtered.
+ *
+ * `DSH_TUI_COUNTS_HIDE` is a comma list of `tools` / `thinking` / `none` / `all`
+ * and outranks the saved booleans.
+ */
+function readHideMode() {
+  const saved = readSettings()
+  let hideTools = saved.hideTools === true
+  let hideThinking = saved.hideThinking === true
+  const raw = String(process.env.DSH_TUI_COUNTS_HIDE ?? '').trim().toLowerCase()
+  if (raw !== '') {
+    const wanted = new Set(raw.split(/[,\s]+/).filter(Boolean))
+    if (wanted.has('none')) {
+      hideTools = false
+      hideThinking = false
+    } else if (wanted.has('all')) {
+      hideTools = true
+      hideThinking = true
+    } else {
+      hideTools = wanted.has('tools')
+      hideThinking = wanted.has('thinking')
+    }
+  }
+  return { hideTools, hideThinking }
+}
+
 function readScope() {
   const fromEnv = String(process.env.DSH_TUI_COUNTS_SCOPE ?? '').trim().toLowerCase()
   if (fromEnv === 'turn' || fromEnv === 'session') return fromEnv
-  try {
-    const raw = JSON.parse(readFileSync(SCOPE_FILE, 'utf8'))
-    if (raw?.scope === 'session' || raw?.scope === 'turn') return raw.scope
-  } catch {
-    /* no saved scope yet */
-  }
+  const saved = readSettings().scope
+  if (saved === 'session' || saved === 'turn') return saved
   return 'turn'
 }
 
-function writeScope(scope) {
+function writeSettings(patch) {
   try {
     mkdirSync(ROOT, { recursive: true })
-    writeFileSync(SCOPE_FILE, JSON.stringify({ version: 1, scope }), { mode: 0o600 })
+    const next = { version: 1, ...readSettings(), ...patch }
+    writeFileSync(SETTINGS_FILE, JSON.stringify(next), { mode: 0o600 })
   } catch {
     /* a failed save must not block the toggle */
   }
@@ -74,8 +114,21 @@ function isBackgroundSession(session) {
   return header !== null && typeof header === 'object' && header.origin === 'subagent'
 }
 
+// The host's MessageList reads this while rendering; setting it at module
+// scope (not inside apply) gives the first frame the final answer.
+const hideMode = readHideMode()
+globalThis.__dshTuiCounts = { ...hideMode }
+
 export function apply(ctx) {
   const ascii = envFlag('DSH_TUI_COUNTS_ASCII')
+  // A skipped postinstall (workspace install, --ignore-scripts) would leave the
+  // row filter out of the host; retry it here. The host module is usually
+  // already imported by now, so a fresh patch takes effect on the next launch.
+  try {
+    if (!envFlag('DSH_TUI_COUNTS_NO_PATCH')) applyHostPatch({ quiet: true })
+  } catch {
+    /* never disturb the TUI for an optional patch */
+  }
   let scope = readScope()
   let disposed = false
   let fieldDispose
@@ -148,7 +201,7 @@ export function apply(ctx) {
           : {
               onClick: () => {
                 scope = scope === 'turn' ? 'session' : 'turn'
-                writeScope(scope)
+                writeSettings({ scope })
                 render()
               },
             }),

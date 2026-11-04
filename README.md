@@ -8,7 +8,7 @@ A `dsh-tui` plugin that turns the transcript into numbers: **tool calls, thinkin
 
 Hover it to see the split (`read 5 · bash 4 · edit 3`, in/out tokens, cache), click it to switch between **this turn** and **the whole session**.
 
-It never rewrites the transcript. The tool cards and thinking blocks are still there — pair it with the TUI's own folding (`Ctrl+O`, `/thinking`, `thinkingFold`) to read a session as counts only.
+It counts from the append-only session log, so it keeps working whether the transcript shows every card or none at all. If you want the cards gone too, there is an **opt-in row filter** (below): the transcript then shows only your prompts, the answers, and this one line of numbers.
 
 ## Install
 
@@ -48,6 +48,41 @@ A resumed session is seeded from `session.snapshotEvents(0)` on first sight; the
 
 Subagent sessions (`header.origin === 'subagent'`) are ignored: they would otherwise steal the single footer seat.
 
+## Hiding the tool cards and thinking blocks
+
+dsh-TUI's plugin API has no transcript-row seam — a plugin can add footer fields, panels and scenes, but it cannot drop a row. The rows *are* filtered before virtualization for two built-ins (`thinkingVisible` behind `/thinking`, and `turnUsageRow`); a filtered row leaves no cached height, no mounted node and no stale click target, which is why removing one has to happen there and not by rendering null.
+
+This package therefore ships an **optional, reversible patch** for the installed host file `lib/types/components/MessageList.js`, which inserts two filters right next to that built-in pair:
+
+```js
+if (__countsMode.hideTools   === true && !expanded) out = out.filter(r => r.kind !== 'tool');
+if (__countsMode.hideThinking === true && !expanded) out = out.filter(r => r.kind !== 'reasoning');
+```
+
+`expanded` is the `Ctrl+O` switch, so **Ctrl+O always brings the rows back** — and because it already participates in the visible-rows cache key, the repaint is correct with no extra plumbing.
+
+Turn it on in `~/.dsh-tui/counts.json` and restart:
+
+```json
+{ "version": 1, "hideTools": true, "hideThinking": true }
+```
+
+or per launch:
+
+```bash
+DSH_TUI_COUNTS_HIDE=all dst     # tools,thinking, all, none
+```
+
+The patch is applied by `postinstall`, and again by the plugin on boot if the package manager skipped install scripts (pnpm 10 blocks them by default). A boot-time patch takes effect on the **next** launch, because the host module is already imported.
+
+What you give up: the patch edits a file inside the host package, so a dsh-TUI upgrade (`dst update`) replaces it and the filter is re-applied on the next install/boot. Nothing else changes, and the anchor check makes an unrecognized future build a silent no-op (the TUI keeps working, rows stay visible). Revert with:
+
+```bash
+node scripts/patch-message-list.mjs --revert   # or: npm run patch:revert
+```
+
+The first patch keeps a byte-identical `MessageList.js.dsh-tui-counts.orig` next to the file, which is what `--revert` restores.
+
 ## Configuration
 
 Small on purpose — three switches, all optional:
@@ -55,7 +90,9 @@ Small on purpose — three switches, all optional:
 | Variable | Values | Default |
 |---|---|---|
 | `DSH_TUI_COUNTS_SCOPE` | `turn` / `session` | saved choice, then `turn` |
+| `DSH_TUI_COUNTS_HIDE` | `tools`, `thinking`, `all`, `none` | saved flags, then all off |
 | `DSH_TUI_COUNTS_ASCII` | `1` to replace `·` with ` | ` | off |
+| `DSH_TUI_COUNTS_NO_PATCH` | `1` to never touch the host | off |
 
 The clicked scope is persisted to `~/.dsh-tui/counts.json`. A variable always wins over the saved value.
 
@@ -69,7 +106,9 @@ The clicked scope is persisted to `~/.dsh-tui/counts.json`. A variable always wi
 ## Development
 
 ```bash
-npm test        # node:test, no host required: the folder is pure
+npm test                          # 23 cases: folding, formatting, the patch script
+node scripts/patch-message-list.mjs            # apply the row filter by hand
+node scripts/patch-message-list.mjs --revert   # restore the host file
 ```
 
 `counts.mjs` is the whole model (fold an event, format a line). `index.mjs` only wires it to the Cordis bus, the footer field and `~/.dsh-tui/resume.txt` (which the TUI rewrites on every foreground switch — the reliable signal for "which session is on screen", since `tui/session-switched` is a DecisionEvent a plain `ctx.on` never sees).
