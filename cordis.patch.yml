@@ -1,0 +1,13 @@
+# dsh-tui-counts bundle patch: mount the plugin into the dsh-tui profile.
+#
+# `dsh plugin --profile dsh-tui add dsh-tui-counts` installs the package into
+# the profile and appends it to `dsh.profile.bundles`, because package.json
+# declares `dsh.bundle.patch`. At boot, app-boot applies this insert list over
+# the profile composition tree — no hand-edited profile config is needed.
+#
+# `name` must stay a bare package name: bundle patches merge into the profile's
+# root config and resolve from the profile directory, so a relative path would
+# point at the wrong place.
+- insert:
+    - id: tui-counts
+      name: 'dsh-tui-counts'

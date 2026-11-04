@@ -1,0 +1,50 @@
+{
+  "name": "dsh-tui-counts",
+  "version": "0.1.0",
+  "description": "Footer counters for dsh-TUI: tool calls, thinking segments and billed tokens for the current turn or the whole session",
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./counts": "./counts.mjs",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "counts.mjs",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-tui",
+    "deepseek",
+    "deepseek-harness",
+    "tui",
+    "tokens"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Devil-SX/dsh-tui-counts.git"
+  },
+  "homepage": "https://github.com/Devil-SX/dsh-tui-counts#readme",
+  "bugs": {
+    "url": "https://github.com/Devil-SX/dsh-tui-counts/issues"
+  },
+  "author": "Shucheng Du"
+}
