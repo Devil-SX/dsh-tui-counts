@@ -13,8 +13,8 @@ It never rewrites the transcript. The tool cards and thinking blocks are still t
 ## Install
 
 ```bash
-dsh plugin --profile dsh-tui add dsh-tui-counts     # from npm, if published
-dsh plugin --profile dsh-tui add file:$PWD          # from a checkout
+dsh plugin --profile dsh-tui add github:Devil-SX/dsh-tui-counts   # from GitHub
+dsh plugin --profile dsh-tui add file:$PWD                        # from a checkout
 ```
 
 The package declares `dsh.bundle.patch`, so the profile picks the plugin up on the next boot — no hand-edited `cordis.patch.yml`:
