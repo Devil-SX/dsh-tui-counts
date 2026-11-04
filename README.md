@@ -73,7 +73,12 @@ or per launch:
 DSH_TUI_COUNTS_HIDE=all dst     # tools,thinking, all, none
 ```
 
-The patch is applied by `postinstall`, and again by the plugin on boot if the package manager skipped install scripts (pnpm 10 blocks them by default). A boot-time patch takes effect on the **next** launch, because the host module is already imported.
+The patch is applied by `postinstall`, and again by the plugin on boot if the package manager skipped install scripts (pnpm 10 blocks them by default). A boot-time patch takes effect on the **next** launch, because the host module is already imported — so after a fresh install, the first `dst` writes the patch and the second one (or `/restart`) hides the rows. To make the first launch count, allow the install script once:
+
+```bash
+pnpm --dir ~/.dsh/profiles/dsh-tui approve-builds   # tick dsh-tui-counts
+dsh plugin --profile dsh-tui add github:Devil-SX/dsh-tui-counts
+```
 
 What you give up: the patch edits a file inside the host package, so a dsh-TUI upgrade (`dst update`) replaces it and the filter is re-applied on the next install/boot. Nothing else changes, and the anchor check makes an unrecognized future build a silent no-op (the TUI keeps working, rows stay visible). Revert with:
 

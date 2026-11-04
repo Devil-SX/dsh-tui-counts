@@ -119,6 +119,18 @@ function isBackgroundSession(session) {
 const hideMode = readHideMode()
 globalThis.__dshTuiCounts = { ...hideMode }
 
+// Patch the host's row filter as early as possible: at module evaluation the
+// host's Chat/MessageList modules are still behind a dynamic import, so a patch
+// written here can land before React renders its first frame. The later retry
+// inside apply() covers package managers that import plugins differently.
+if ((hideMode.hideTools || hideMode.hideThinking) && !envFlag('DSH_TUI_COUNTS_NO_PATCH')) {
+  try {
+    applyHostPatch({ quiet: true })
+  } catch {
+    /* an optional patch never disturbs the TUI */
+  }
+}
+
 export function apply(ctx) {
   const ascii = envFlag('DSH_TUI_COUNTS_ASCII')
   // A skipped postinstall (workspace install, --ignore-scripts) would leave the
